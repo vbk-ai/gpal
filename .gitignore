@@ -1,0 +1,5 @@
+.gdrive_token
+.env
+__pycache__/
+.venv/
+requirements.txt
