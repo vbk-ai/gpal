@@ -20,6 +20,7 @@ from gpal_agent.config import (
     GpalConfig,
     get_config,
     select_optimal_model_tier,
+    verify_gcp_adc_or_exit,
 )
 from gpal_agent.guardrails import (
     get_configured_plugins,
@@ -75,6 +76,7 @@ def combined_before_model_callback(
     Returns:
         `None` when allowed to proceed, or an `LlmResponse` when blocked by a safety guardrail.
     """
+    verify_gcp_adc_or_exit()
     state = getattr(callback_context, "state", None)
     contents = getattr(llm_request, "contents", None)
 
@@ -169,6 +171,7 @@ def _create_adk_agents_and_app(
 ) -> tuple[Any, Any, Any, Any]:
     """Instantiate the specialized sub-agents, root coordinator agent, and ADK App."""
     cfg = config or get_config()
+    verify_gcp_adc_or_exit(cfg)
     setup_cloud_tracing(
         project_id=cfg.project_id or None,
         export_to_cloud=cfg.enable_cloud_trace and bool(cfg.project_id),

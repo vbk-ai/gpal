@@ -393,12 +393,23 @@ def synthesize_speech_bytes(
                     if raw_audio:
                         return wrap_pcm_in_wav(raw_audio), model_id
                 except Exception as model_exc:
+                    from gpal_agent.config import (
+                        is_reauth_error,
+                        terminate_on_reauth_error,
+                    )
+
+                    if is_reauth_error(model_exc):
+                        terminate_on_reauth_error(model_exc)
                     _get_logger().debug(
                         "TTS model '%s' unavailable (%s); trying next in cascade.",
                         model_id,
                         model_exc,
                     )
         except Exception as client_exc:
+            from gpal_agent.config import is_reauth_error, terminate_on_reauth_error
+
+            if is_reauth_error(client_exc):
+                terminate_on_reauth_error(client_exc)
             _get_logger().debug(
                 "GenAI TTS client unavailable (%s); using local WAV fallback.",
                 client_exc,

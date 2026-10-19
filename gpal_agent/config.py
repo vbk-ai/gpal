@@ -233,3 +233,129 @@ def select_optimal_model_tier(
         "routing_reason": "Standard conversational turn optimized for low latency",
     }
 
+
+# ==============================================================================
+# Google Cloud ADC Reauthentication Preflight & Immediate Exit Guard
+# ==============================================================================
+def is_reauth_error(exc: BaseException | None) -> bool:
+    """Return True if `exc` indicates expired ADC credentials requiring reauthentication."""
+    if exc is None:
+        return False
+    current: BaseException | None = exc
+    visited: set[int] = set()
+    while current is not None and id(current) not in visited:
+        visited.add(id(current))
+        cls_name = type(current).__name__
+        msg = str(current).lower()
+        if (
+            cls_name == "RefreshError"
+            or "reauthentication is needed" in msg
+            or "gcloud auth application-default login" in msg
+            or "invalid_grant" in msg
+            or "invalid_rapt" in msg
+        ):
+            return True
+        current = current.__cause__ or current.__context__
+    return False
+
+
+def terminate_on_reauth_error(exc: BaseException) -> None:
+    """Write an actionable reauthentication banner to stderr and exit immediately.
+
+    Uses `os._exit(1)` outside of pytest so background gRPC / OpenTelemetry threads
+    and uvicorn workers cannot trap `SystemExit` or block `Ctrl+C` (`SIGINT`).
+    """
+    import sys
+
+    banner = (
+        "\n"
+        + "=" * 78
+        + "\n[GPAL AUTH ERROR] Google Cloud Application Default Credentials (ADC) expired!\n"
+        + f"Details: {exc}\n\n"
+        + "Please reauthenticate in your terminal first:\n"
+        + "  gcloud auth application-default login\n"
+        + "and then re-run your command.\n"
+        + "=" * 78
+        + "\n"
+    )
+    sys.stderr.write(banner)
+    sys.stderr.flush()
+
+    in_pytest = "pytest" in sys.modules
+    disable_hard_exit = os.getenv(
+        "GPAL_DISABLE_HARD_EXIT_ON_REAUTH", "FALSE"
+    ).upper() in ("TRUE", "1", "YES")
+
+    if in_pytest or disable_hard_exit:
+        raise SystemExit(1) from exc
+    os._exit(1)
+
+
+def verify_gcp_adc_or_exit(
+    config: GpalConfig | None = None,
+    *,
+    force_check: bool = False,
+) -> bool:
+    """Verify Google Cloud ADC credentials can refresh without `RefreshError`, or exit immediately.
+
+    Args:
+        config: Optional `GpalConfig` instance.
+        force_check: When True, runs the check even inside offline test contexts.
+
+    Returns:
+        `True` when credentials are valid (or cloud calls are disabled), `False` if offline.
+    """
+    import socket
+    import sys
+
+    cfg = config or get_config()
+
+    if not force_check:
+        if "pytest" in sys.modules:
+            return True
+        if os.getenv("GPAL_OFFLINE_TTS_FALLBACK", "FALSE").upper() in (
+            "TRUE",
+            "1",
+            "YES",
+        ):
+            return True
+        if os.getenv("GPAL_SKIP_AUTH_PREFLIGHT", "FALSE").upper() in (
+            "TRUE",
+            "1",
+            "YES",
+        ):
+            return True
+
+    needs_gcp_auth = (
+        (cfg.use_vertexai and bool(cfg.project_id))
+        or (cfg.enable_cloud_trace and bool(cfg.project_id))
+        or (cfg.enable_cloud_dlp and bool(cfg.project_id))
+        or bool(cfg.model_armor_template_id)
+    )
+    if not needs_gcp_auth and not force_check:
+        return True
+
+    if not force_check:
+        try:
+            with socket.create_connection(("oauth2.googleapis.com", 443), timeout=0.5):
+                pass
+        except OSError:
+            return False
+
+    try:
+        import google.auth
+        import google.auth.transport.requests
+
+        credentials, _ = google.auth.default(
+            scopes=["https://www.googleapis.com/auth/cloud-platform"]
+        )
+        if not getattr(credentials, "valid", False):
+            request = google.auth.transport.requests.Request()
+            credentials.refresh(request)
+        return True
+    except BaseException as exc:
+        if is_reauth_error(exc):
+            terminate_on_reauth_error(exc)
+        return False
+
+

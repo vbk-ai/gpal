@@ -283,6 +283,10 @@ class PiiScrubber:
                 if isinstance(extracted, str) and extracted and extracted != text:
                     return _normalize_dlp_tokens(extracted), ["MODEL_ARMOR_SDP"]
         except Exception as exc:
+            from gpal_agent.config import is_reauth_error, terminate_on_reauth_error
+
+            if is_reauth_error(exc):
+                terminate_on_reauth_error(exc)
             self._model_armor_available = False
             _get_logger().debug(
                 "Model Armor sanitization skipped or unavailable: %s", exc
@@ -341,6 +345,10 @@ class PiiScrubber:
             ):
                 return _normalize_dlp_tokens(deidentified_value), ["CLOUD_DLP"]
         except Exception as exc:
+            from gpal_agent.config import is_reauth_error, terminate_on_reauth_error
+
+            if is_reauth_error(exc):
+                terminate_on_reauth_error(exc)
             self._dlp_available = False
             _get_logger().debug(
                 "Cloud DLP de-identification skipped or unavailable: %s", exc

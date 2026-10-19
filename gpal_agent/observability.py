@@ -492,9 +492,16 @@ def setup_cloud_tracing(
     ):
         try:
             import socket
+            from gpal_agent.config import (
+                is_reauth_error,
+                terminate_on_reauth_error,
+                verify_gcp_adc_or_exit,
+            )
 
             with socket.create_connection(("oauth2.googleapis.com", 443), timeout=0.5):
                 pass
+            if not verify_gcp_adc_or_exit(cfg):
+                return _TRACER_PROVIDER
             from opentelemetry.exporter.cloud_trace import (  # type: ignore[import-untyped]
                 CloudTraceSpanExporter,
             )
@@ -503,6 +510,10 @@ def setup_cloud_tracing(
             _TRACER_PROVIDER.add_span_processor(BatchSpanProcessor(cloud_exporter))
             _CLOUD_TRACE_EXPORTER_PROJECTS.add(resolved_project)
         except Exception as exc:
+            from gpal_agent.config import is_reauth_error, terminate_on_reauth_error
+
+            if is_reauth_error(exc):
+                terminate_on_reauth_error(exc)
             get_structured_logger().warning(
                 "Cloud Trace exporter unavailable for project '%s' (%s); "
                 "continuing with in-memory span exporter.",

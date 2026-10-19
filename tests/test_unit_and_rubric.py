@@ -1071,3 +1071,40 @@ def test_5_3_secure_secret_management_and_repo_hygiene(
         assert forbidden_api_key_prefix not in content, (
             f"Leaked API key prefix found in {file_path.relative_to(PROJECT_ROOT)}"
         )
+
+
+def test_5_4_adc_reauth_preflight_exits_cleanly(
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    """Verify ADC reauthentication errors trigger an immediate exit with actionable instructions."""
+    import google.auth
+    from google.auth import exceptions as auth_exceptions
+    from gpal_agent.config import GpalConfig, is_reauth_error, verify_gcp_adc_or_exit
+
+    reauth_err = auth_exceptions.RefreshError(
+        "Reauthentication is needed. Please run `gcloud auth application-default login` to reauthenticate."
+    )
+    assert is_reauth_error(reauth_err) is True
+
+    class _ExpiredCreds:
+        valid = False
+
+        def refresh(self, request: Any) -> None:
+            raise reauth_err
+
+    monkeypatch.setattr(
+        google.auth,
+        "default",
+        lambda scopes=None: (_ExpiredCreds(), "demo-proj"),
+    )
+
+    cfg = GpalConfig(project_id="demo-proj", use_vertexai=True)
+    with pytest.raises(SystemExit) as exc_info:
+        verify_gcp_adc_or_exit(cfg, force_check=True)
+
+    assert exc_info.value.code == 1
+    captured = capsys.readouterr()
+    assert "[GPAL AUTH ERROR]" in captured.err
+    assert "gcloud auth application-default login" in captured.err
+
