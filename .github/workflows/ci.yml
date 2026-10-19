@@ -1,0 +1,63 @@
+name: GPAL CI — Tests & Terraform Validation
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
+
+permissions:
+  contents: read
+
+jobs:
+  pytest-and-lint:
+    name: Python 3.11 Unit & Integration Tests
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: "pip"
+
+      - name: Install GPAL Package & Test Dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -e ".[dev]"
+
+      - name: Run Pytest Suite
+        env:
+          GOOGLE_GENAI_USE_VERTEXAI: "FALSE"
+          ENABLE_CLOUD_TRACE: "FALSE"
+          ENABLE_CLOUD_DLP: "FALSE"
+        run: |
+          pytest -v
+
+      - name: Verify Deployment Dry-Run Plan
+        run: |
+          python scripts/deploy_agent_engine.py --dry-run
+
+  terraform-validate:
+    name: Terraform IaC Formatting & Validation
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: "1.6.6"
+
+      - name: Check Terraform Formatting
+        run: terraform -chdir=terraform fmt -check
+
+      - name: Initialize & Validate Terraform Configuration
+        run: |
+          terraform -chdir=terraform init -backend=false
+          terraform -chdir=terraform validate

@@ -1,0 +1,26 @@
+# ==============================================================================
+# GPAL ("Google Pal") — Example Terraform Variables
+# Copy this file to `dev.tfvars`, `staging.tfvars`, or `prod.tfvars` and run:
+#   terraform -chdir=terraform init
+#   terraform -chdir=terraform apply -var-file="dev.tfvars"
+#   terraform -chdir=terraform output -raw dotenv_configuration > .env
+# ==============================================================================
+
+project_id           = "your-gcp-project-id"
+region               = "us-central1"
+model_armor_location = "us-central1"
+environment          = "dev" # Allowed values: "dev", "staging", "prod"
+agent_name           = "gpal-agent"
+
+pii_info_types = [
+  "EMAIL_ADDRESS",
+  "PHONE_NUMBER",
+  "US_SOCIAL_SECURITY_NUMBER",
+  "CREDIT_CARD_NUMBER",
+  "IP_ADDRESS",
+]
+
+labels = {
+  "app"        = "gpal-agent"
+  "managed-by" = "terraform"
+}

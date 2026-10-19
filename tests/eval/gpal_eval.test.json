@@ -1,0 +1,140 @@
+{
+  "eval_set_id": "gpal_golden_evaluation_set",
+  "name": "GPAL Golden Multi-Turn Evaluation Suite",
+  "description": "Evaluates GPAL across voice preference switching, Google Search grounding delegation, and PII-redacted personal milestone storage.",
+  "eval_cases": [
+    {
+      "eval_id": "case_1_switch_voice_to_aoede",
+      "description": "User requests switching the companion voice to Aoede across sessions.",
+      "session_input": {
+        "app_name": "gpal_agent",
+        "user_id": "eval_user_voice",
+        "state": {
+          "user:preferred_voice": "Puck",
+          "user:friend_notes": [],
+          "user:friend_profile_summary": ""
+        }
+      },
+      "conversation": [
+        {
+          "invocation_id": "inv_voice_001",
+          "user_content": {
+            "role": "user",
+            "parts": [
+              {
+                "text": "Hey GPAL, can you switch your voice to Aoede so you sound breezy and cheerful in our future chats?"
+              }
+            ]
+          },
+          "intermediate_data": {
+            "tool_uses": [
+              {
+                "name": "set_preferred_voice",
+                "args": {
+                  "voice_name": "Aoede"
+                }
+              }
+            ]
+          },
+          "final_response": {
+            "role": "model",
+            "parts": [
+              {
+                "text": "I've switched my voice to Aoede and saved that preference for all of our future conversations!"
+              }
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "eval_id": "case_2_factual_search_grounding",
+      "description": "User asks a verifiable factual question that must be delegated to fact_checker_search_agent.",
+      "session_input": {
+        "app_name": "gpal_agent",
+        "user_id": "eval_user_search",
+        "state": {
+          "user:preferred_voice": "Kore",
+          "user:friend_notes": [],
+          "user:friend_profile_summary": ""
+        }
+      },
+      "conversation": [
+        {
+          "invocation_id": "inv_search_001",
+          "user_content": {
+            "role": "user",
+            "parts": [
+              {
+                "text": "What mission did NASA launch to study Jupiter's icy moon Europa, and when did it launch?"
+              }
+            ]
+          },
+          "intermediate_data": {
+            "tool_uses": [
+              {
+                "name": "fact_checker_search_agent",
+                "args": {
+                  "request": "NASA mission to study Jupiter's moon Europa and launch date"
+                }
+              }
+            ]
+          },
+          "final_response": {
+            "role": "model",
+            "parts": [
+              {
+                "text": "NASA launched the Europa Clipper mission in October 2024 to conduct detailed reconnaissance of Jupiter's icy moon Europa!"
+              }
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "eval_id": "case_3_personal_milestone_with_pii_redaction",
+      "description": "User shares a personal milestone alongside raw PII; GPAL scrubs PII and stores the sanitized note.",
+      "session_input": {
+        "app_name": "gpal_agent",
+        "user_id": "eval_user_memory",
+        "state": {
+          "user:preferred_voice": "Aoede",
+          "user:friend_notes": [],
+          "user:friend_profile_summary": ""
+        }
+      },
+      "conversation": [
+        {
+          "invocation_id": "inv_memory_001",
+          "user_content": {
+            "role": "user",
+            "parts": [
+              {
+                "text": "I just registered for my first half-marathon in October! My confirmation email went to runner.alex@example.com and my phone is 415-555-0199."
+              }
+            ]
+          },
+          "intermediate_data": {
+            "tool_uses": [
+              {
+                "name": "save_friend_memory_note",
+                "args": {
+                  "memory_note": "Registered for first half-marathon in October",
+                  "category": "personal_milestone"
+                }
+              }
+            ]
+          },
+          "final_response": {
+            "role": "model",
+            "parts": [
+              {
+                "text": "Congratulations on signing up for your first half-marathon in October! I've saved that milestone so we can track your training together."
+              }
+            ]
+          }
+        }
+      ]
+    }
+  ]
+}

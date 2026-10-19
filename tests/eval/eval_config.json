@@ -1,0 +1,7 @@
+{
+  "criteria": {
+    "tool_trajectory_avg_score": 1.0,
+    "response_match_score": 0.7
+  },
+  "description": "ADK evaluation criteria for GPAL voice preference management, Google Search grounding delegation, and PII-safe friend memory persistence."
+}
